@@ -1,0 +1,13 @@
+{
+  "name": "nexuslink-chat",
+  "version": "1.0.0",
+  "description": "My first real-time messenger",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.2"
+  }
+}
