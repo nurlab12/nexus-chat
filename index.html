@@ -1,67 +1,158 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
-const path = require('path');
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NexusLink Ultra</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { background: #0f172a; color: white; font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
+    </style>
+</head>
+<body class="h-screen overflow-hidden">
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+    <div id="auth-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]">
+        <div class="glass p-8 rounded-3xl w-full max-w-sm border-2 border-blue-500/20 shadow-2xl text-center">
+            <h1 class="text-3xl font-black italic mb-6 tracking-tighter">NEXUS<span class="text-blue-500">LINK</span></h1>
+            <div class="space-y-4">
+                <input id="in-nick" type="text" placeholder="Ваш ник" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                <input id="in-id" type="text" placeholder="Уникальный ID" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm font-mono focus:ring-2 focus:ring-blue-500 outline-none transition-all text-white">
+                <input id="in-pass" type="password" placeholder="Пароль" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none transition-all">
+                <p id="auth-error" class="text-red-500 text-[10px] hidden"></p>
+                <button onclick="auth()" class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-black text-xs transition-all active:scale-95 shadow-lg shadow-blue-600/30">ПОДКЛЮЧИТЬСЯ</button>
+            </div>
+        </div>
+    </div>
 
-app.use(express.static(__dirname));
+    <div id="app-screen" class="hidden h-screen flex">
+        <div class="w-20 md:w-80 bg-slate-950 border-r border-slate-900 flex flex-col">
+            <div class="p-6 border-b border-slate-900 flex justify-between items-center">
+                <span class="font-black italic hidden md:block">NEXUS PRO</span>
+                <i class="fas fa-cog text-slate-500 hover:text-white cursor-pointer transition"></i>
+            </div>
+            <div id="user-list" class="flex-1 overflow-y-auto custom-scrollbar p-2 space-y-1">
+                <div onclick="switchChat('global')" id="btn-global" class="p-3 bg-blue-600/10 border-l-4 border-blue-500 rounded-lg cursor-pointer flex items-center">
+                    <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold mr-3"><i class="fas fa-globe"></i></div>
+                    <div class="hidden md:block"><p class="text-sm font-bold">Global Chat</p></div>
+                </div>
+                <div id="contacts" class="mt-4 space-y-1"></div>
+            </div>
+            <div class="p-4 bg-slate-900 flex items-center gap-3">
+                <div id="my-avatar" class="w-10 h-10 rounded-full flex items-center justify-center font-black">?</div>
+                <div class="hidden md:block overflow-hidden"><p id="my-nick" class="text-xs font-bold truncate"></p><p id="my-id" class="text-[9px] text-slate-500"></p></div>
+            </div>
+        </div>
 
-let usersDB = {}; // База аккаунтов
-let onlineUsers = {}; // Кто в сети прямо сейчас
+        <div class="flex-1 flex flex-col bg-[#0b0e14]">
+            <div class="p-4 glass border-b border-slate-800 flex items-center">
+                <div id="chat-avatar" class="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center font-bold mr-3 text-xs">G</div>
+                <h2 id="chat-title" class="font-bold text-sm">Global Chat</h2>
+            </div>
+            <div id="messages" class="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar"></div>
+            <div class="p-4">
+                <form id="msg-form" class="max-w-4xl mx-auto flex gap-2 bg-slate-900 p-2 rounded-2xl border border-slate-800 shadow-xl">
+                    <input id="m-input" autocomplete="off" placeholder="Напишите сообщение..." class="flex-1 bg-transparent px-4 py-2 text-sm outline-none text-white">
+                    <button class="bg-blue-600 w-12 h-10 rounded-xl flex items-center justify-center hover:bg-blue-500 transition shadow-lg shadow-blue-600/20">
+                        <i class="fas fa-paper-plane text-xs"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
 
-io.on('connection', (socket) => {
-    // Логика авторизации
-    socket.on('auth request', (data) => {
-        const { nick, id, password } = data;
-        if (!nick || !id || !password) return;
+    <script>
+        const socket = io();
+        let me = { nick: '', id: '', color: '' };
+        let activeChat = 'global';
+        let onlineUsers = {};
 
-        if (usersDB[id]) {
-            if (usersDB[id].password === password) {
-                login(id, usersDB[id].nick);
+        function auth() {
+            const nick = document.getElementById('in-nick').value;
+            const id = document.getElementById('in-id').value;
+            const password = document.getElementById('in-pass').value;
+            if (nick && id && password) {
+                socket.emit('auth request', { nick, id, password });
+            }
+        }
+
+        socket.on('auth error', (msg) => {
+            const err = document.getElementById('auth-error');
+            err.innerText = msg; err.classList.remove('hidden');
+        });
+
+        socket.on('auth success', (data) => {
+            me = data;
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('app-screen').classList.remove('hidden');
+            document.getElementById('my-nick').innerText = me.nick;
+            document.getElementById('my-id').innerText = "ID: " + me.id;
+            document.getElementById('my-avatar').innerText = me.nick[0].toUpperCase();
+            document.getElementById('my-avatar').style.backgroundColor = me.color;
+        });
+
+        socket.on('update users', (users) => {
+            onlineUsers = users;
+            const cont = document.getElementById('contacts');
+            cont.innerHTML = '';
+            for (let id in users) {
+                if (id === me.id) continue;
+                const u = users[id];
+                const d = document.createElement('div');
+                d.className = `p-3 hover:bg-slate-900 rounded-lg cursor-pointer flex items-center transition ${activeChat === id ? 'bg-slate-900 border-r-2 border-blue-500' : ''}`;
+                d.onclick = () => switchChat(id);
+                d.innerHTML = `
+                    <div class="w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-bold mr-3" style="background:${u.color}">${u.nick[0].toUpperCase()}</div>
+                    <div class="hidden md:block overflow-hidden"><p class="text-xs font-bold truncate">${u.nick}</p><p class="text-[9px] text-slate-500">ID: ${id}</p></div>
+                `;
+                cont.appendChild(d);
+            }
+        });
+
+        function switchChat(target) {
+            activeChat = target;
+            document.getElementById('messages').innerHTML = '';
+            if (target === 'global') {
+                document.getElementById('chat-title').innerText = "Global Chat";
+                document.getElementById('chat-avatar').innerText = "G";
+                document.getElementById('chat-avatar').style.backgroundColor = "#2563eb";
             } else {
-                socket.emit('auth error', 'Неверный пароль для этого ID!');
-            }
-        } else {
-            usersDB[id] = { nick, password };
-            login(id, nick);
-        }
-
-        function login(userId, userNick) {
-            const color = `hsl(${Math.random() * 360}, 70%, 60%)`;
-            onlineUsers[userId] = { nick: userNick, socketId: socket.id, color: color };
-            socket.emit('auth success', { nick: userNick, id: userId, color: color });
-            io.emit('update users', onlineUsers); // Обновляем список контактов у всех
-        }
-    });
-
-    // Логика сообщений (Глобал и Личка)
-    socket.on('chat message', (msg) => {
-        msg.time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        
-        if (msg.to === 'global') {
-            io.emit('chat message', msg);
-        } else {
-            const target = onlineUsers[msg.to];
-            if (target) {
-                // Отправляем только отправителю и получателю
-                io.to(target.socketId).to(socket.id).emit('chat message', msg);
+                const u = onlineUsers[target];
+                document.getElementById('chat-title').innerText = u.nick;
+                document.getElementById('chat-avatar').innerText = u.nick[0].toUpperCase();
+                document.getElementById('chat-avatar').style.backgroundColor = u.color;
             }
         }
-    });
 
-    socket.on('disconnect', () => {
-        for (let id in onlineUsers) {
-            if (onlineUsers[id].socketId === socket.id) {
-                delete onlineUsers[id];
-                break;
+        document.getElementById('msg-form').onsubmit = (e) => {
+            e.preventDefault();
+            const inp = document.getElementById('m-input');
+            if (inp.value.trim()) {
+                socket.emit('chat message', { user: me.nick, id: me.id, to: activeChat, text: inp.value, color: me.color });
+                inp.value = '';
             }
-        }
-        io.emit('update users', onlineUsers);
-    });
-});
+        };
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 NexusLink Ultra Full запущен на порту ${PORT}`));
+        socket.on('chat message', (msg) => {
+            const isMe = msg.id === me.id;
+            const box = document.getElementById('messages');
+            const d = document.createElement('div');
+            d.className = `flex ${isMe ? 'justify-end' : 'justify-start'}`;
+            d.innerHTML = `
+                <div class="max-w-[75%]">
+                    <p class="text-[9px] font-bold mb-1 opacity-50 ${isMe ? 'text-right' : ''}">${msg.user}</p>
+                    <div class="${isMe ? 'bg-blue-600 rounded-tr-none' : 'bg-slate-800 rounded-tl-none border border-slate-700'} px-4 py-2 rounded-2xl shadow-lg">
+                        <p class="text-sm">${msg.text}</p>
+                    </div>
+                </div>
+            `;
+            box.appendChild(d);
+            box.scrollTop = box.scrollHeight;
+        });
+    </script>
+</body>
+</html>
