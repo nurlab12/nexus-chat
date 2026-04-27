@@ -3,106 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NexusLink Ultra Pro</title>
+    <title>NexusLink Ultra</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { transition: background 0.3s; background: #0f172a; color: white; font-family: 'Inter', sans-serif; }
-        .light-theme { background: #f1f5f9; color: #0f172a; }
-        .light-theme .glass { background: rgba(255, 255, 255, 0.8); border: 1px solid #ddd; color: #333; }
-        .light-theme #sidebar { background: #fff; border-right: 1px solid #ddd; }
-        .light-theme #messages { background: #f8fafc; }
-        
+        body { background: #0f172a; color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
         .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.1); }
-        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
-        
-        @media (max-width: 768px) {
-            .mobile-hidden { display: none !important; }
-            .mobile-full { width: 100% !important; position: fixed; inset: 0; z-index: 40; }
-        }
+        .emoji-panel { display: none; bottom: 80px; right: 20px; z-index: 100; }
+        @media (max-width: 768px) { .mobile-hidden { display: none !important; } .mobile-full { width: 100% !important; position: fixed; inset: 0; z-index: 40; } }
     </style>
 </head>
-<body class="h-screen overflow-hidden">
-
-    <div id="settings-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div class="glass p-6 rounded-3xl w-full max-w-md shadow-2xl">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-xl font-bold">Настройки</h2>
-                <button onclick="toggleSettings()" class="text-slate-400 hover:text-white"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="space-y-6">
-                <div class="flex justify-between items-center">
-                    <span>Темная тема</span>
-                    <button onclick="changeTheme()" class="w-12 h-6 bg-blue-600 rounded-full relative"><div id="theme-dot" class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full transition-all"></div></button>
-                </div>
-                <div>
-                    <label class="text-[10px] uppercase font-bold text-slate-500 mb-2 block">Цвет профиля</label>
-                    <div class="flex gap-3">
-                        <div onclick="changeColor('#3b82f6')" class="w-8 h-8 bg-blue-500 rounded-full cursor-pointer border-2 border-white"></div>
-                        <div onclick="changeColor('#ef4444')" class="w-8 h-8 bg-red-500 rounded-full cursor-pointer"></div>
-                        <div onclick="changeColor('#10b981')" class="w-8 h-8 bg-emerald-500 rounded-full cursor-pointer"></div>
-                        <div onclick="changeColor('#f59e0b')" class="w-8 h-8 bg-amber-500 rounded-full cursor-pointer"></div>
-                    </div>
-                </div>
-                <button onclick="toggleSettings()" class="w-full bg-slate-800 py-3 rounded-xl font-bold text-sm">Закрыть</button>
-            </div>
-        </div>
-    </div>
+<body class="h-screen flex flex-col">
 
     <div id="auth-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a] p-4">
-        <div class="glass p-8 rounded-3xl w-full max-w-sm border-2 border-blue-500/20 shadow-2xl text-center">
+        <div class="glass p-8 rounded-3xl w-full max-w-sm text-center">
             <h1 class="text-3xl font-black italic mb-6">NEXUS<span class="text-blue-500">LINK</span></h1>
-            <div class="space-y-4">
-                <input id="in-nick" type="text" placeholder="Ваш ник" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 text-white">
-                <input id="in-id" type="text" placeholder="ID (латиница)" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm font-mono outline-none focus:ring-2 focus:ring-blue-500 text-white">
-                <input id="in-pass" type="password" placeholder="Пароль" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 text-white">
-                <button onclick="auth()" class="w-full bg-blue-600 hover:bg-blue-500 py-4 rounded-xl font-black text-xs">ПОДКЛЮЧИТЬСЯ</button>
-            </div>
+            <input id="in-nick" type="text" placeholder="Ник" class="w-full bg-slate-900 mb-3 rounded-xl px-4 py-3 text-white outline-none border border-slate-700">
+            <input id="in-id" type="text" placeholder="ID" class="w-full bg-slate-900 mb-3 rounded-xl px-4 py-3 text-white outline-none border border-slate-700">
+            <input id="in-pass" type="password" placeholder="Пароль" class="w-full bg-slate-900 mb-6 rounded-xl px-4 py-3 text-white outline-none border border-slate-700">
+            <button onclick="auth()" class="w-full bg-blue-600 py-4 rounded-xl font-black shadow-lg hover:bg-blue-500 transition">ВОЙТИ</button>
         </div>
     </div>
 
     <div id="app-screen" class="hidden h-screen flex overflow-hidden">
-        
-        <div id="sidebar" class="w-full md:w-80 bg-slate-950 border-r border-slate-900 flex flex-col z-30">
-            <div class="p-4 border-b border-slate-900 flex justify-between items-center">
-                <span class="font-black italic text-xl">NEXUS</span>
-                <button onclick="toggleSettings()" class="text-slate-400 hover:text-white"><i class="fas fa-cog"></i></button>
+        <div id="sidebar" class="w-full md:w-80 bg-slate-950 border-r border-slate-900 flex flex-col">
+            <div class="p-4 flex justify-between items-center border-b border-slate-900">
+                <span class="font-black italic text-xl text-blue-500">NEXUS</span>
+                <button onclick="alert('Ваш ID: ' + me.id)" class="text-slate-500 hover:text-white"><i class="fas fa-cog"></i></button>
             </div>
             <div class="p-3">
-                <input id="user-search" oninput="renderContacts(this.value)" type="text" placeholder="Поиск по ID..." class="w-full bg-slate-900 rounded-xl px-4 py-2 text-xs outline-none border border-slate-800">
-            </div>
-            <div id="user-list" class="flex-1 overflow-y-auto custom-scrollbar p-2">
-                <div onclick="switchChat('global')" id="btn-global" class="p-4 bg-blue-600/10 border-l-4 border-blue-500 rounded-xl cursor-pointer flex items-center mb-2">
-                    <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mr-3"><i class="fas fa-globe"></i></div>
-                    <p class="text-sm font-bold">Global Chat</p>
+                <div class="relative">
+                    <i class="fas fa-search absolute left-3 top-3 text-slate-500 text-xs"></i>
+                    <input id="u-search" oninput="renderContacts(this.value)" type="text" placeholder="Поиск по ID..." class="w-full bg-slate-900 rounded-xl pl-9 py-2 text-xs outline-none border border-slate-800">
                 </div>
-                <div id="contacts" class="space-y-1"></div>
             </div>
-            <div class="p-4 bg-slate-900/80 border-t border-slate-800 flex items-center">
-                <div id="my-avatar" class="w-10 h-10 rounded-full flex items-center justify-center font-black mr-3 shadow-lg text-white">?</div>
-                <div><p id="my-nick" class="text-xs font-bold"></p><p id="my-id" class="text-[10px] text-slate-500"></p></div>
+            <div id="user-list" class="flex-1 overflow-y-auto p-2 space-y-1">
+                <div onclick="switchChat('global')" id="btn-global" class="p-4 bg-blue-600/10 rounded-xl cursor-pointer flex items-center mb-2 border-l-4 border-blue-500">
+                    <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mr-3"><i class="fas fa-globe"></i></div>
+                    <p class="font-bold text-sm">Global Chat</p>
+                </div>
+                <div id="contacts"></div>
             </div>
         </div>
 
-        <div id="chat-window" class="mobile-hidden flex-1 flex flex-col bg-[#0b0e14] z-40">
-            <div class="p-3 glass border-b border-slate-800 flex justify-between items-center">
+        <div id="chat-window" class="mobile-hidden flex-1 flex flex-col bg-[#0b0e14] relative">
+            <div class="p-3 glass flex items-center justify-between border-b border-slate-800">
                 <div class="flex items-center">
                     <button onclick="closeChat()" class="md:hidden mr-3"><i class="fas fa-arrow-left"></i></button>
-                    <div id="chat-avatar" class="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center font-bold mr-3 text-xs text-white">G</div>
+                    <div id="chat-avatar" class="w-9 h-9 bg-blue-600 rounded-full flex items-center justify-center mr-3 text-xs font-bold shadow-lg">G</div>
                     <h2 id="chat-title" class="font-bold text-sm">Global Chat</h2>
                 </div>
                 <div class="flex gap-4 px-2">
-                    <button onclick="alert('Вызов...')"><i class="fas fa-phone text-slate-400"></i></button>
-                    <button onclick="alert('Видеосвязь...')"><i class="fas fa-video text-slate-400"></i></button>
+                    <button onclick="alert('Звонок...')"><i class="fas fa-phone text-slate-500 hover:text-blue-500"></i></button>
+                    <button onclick="alert('Видео...')"><i class="fas fa-video text-slate-500 hover:text-blue-500"></i></button>
                 </div>
             </div>
-            <div id="messages" class="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar"></div>
+
+            <div id="messages" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
+
+            <div id="emoji-box" class="emoji-panel absolute glass p-4 rounded-2xl grid grid-cols-6 gap-3 shadow-2xl border border-blue-500/30">
+                <span onclick="addEmoji('😊')" class="cursor-pointer hover:scale-125 transition">😊</span>
+                <span onclick="addEmoji('😂')" class="cursor-pointer hover:scale-125 transition">😂</span>
+                <span onclick="addEmoji('🔥')" class="cursor-pointer hover:scale-125 transition">🔥</span>
+                <span onclick="addEmoji('❤️')" class="cursor-pointer hover:scale-125 transition">❤️</span>
+                <span onclick="addEmoji('💀')" class="cursor-pointer hover:scale-125 transition">💀</span>
+                <span onclick="addEmoji('👍')" class="cursor-pointer hover:scale-125 transition">👍</span>
+            </div>
+
             <div class="p-4">
-                <form id="msg-form" class="max-w-4xl mx-auto flex items-center gap-2 glass p-2 rounded-2xl">
-                    <input id="m-input" autocomplete="off" placeholder="Сообщение..." class="flex-1 bg-transparent px-4 py-2 text-sm outline-none text-white">
-                    <button class="bg-blue-600 w-12 h-10 rounded-xl flex items-center justify-center shadow-lg"><i class="fas fa-paper-plane text-xs"></i></button>
+                <form id="msg-form" class="max-w-4xl mx-auto flex gap-2 glass p-2 rounded-2xl border border-slate-800">
+                    <button type="button" onclick="document.getElementById('file-input').click()" class="px-3 text-slate-500 hover:text-blue-500"><i class="fas fa-paperclip"></i></button>
+                    <input id="file-input" type="file" class="hidden" accept="image/*">
+                    <input id="m-input" autocomplete="off" placeholder="Напишите сообщение..." class="flex-1 bg-transparent px-2 text-sm outline-none text-white">
+                    <button type="button" onclick="toggleEmoji()" class="px-2 text-slate-500 hover:text-yellow-500"><i class="far fa-smile"></i></button>
+                    <button class="bg-blue-600 w-12 h-10 rounded-xl flex items-center justify-center hover:bg-blue-500 transition shadow-lg"><i class="fas fa-paper-plane text-xs"></i></button>
                 </form>
             </div>
         </div>
@@ -113,23 +88,17 @@
         let me = { nick: '', id: '', color: '' };
         let activeChat = 'global';
         let onlineUsers = {};
-        let isDark = true;
 
         function auth() {
             const nick = document.getElementById('in-nick').value;
             const id = document.getElementById('in-id').value;
-            const password = document.getElementById('in-pass').value;
-            if (nick && id && password) socket.emit('auth request', { nick, id, password });
+            if (nick && id) socket.emit('auth request', { nick, id });
         }
 
         socket.on('auth success', (data) => {
             me = data;
             document.getElementById('auth-screen').classList.add('hidden');
             document.getElementById('app-screen').classList.remove('hidden');
-            document.getElementById('my-nick').innerText = me.nick;
-            document.getElementById('my-id').innerText = "ID: " + me.id;
-            document.getElementById('my-avatar').innerText = me.nick[0].toUpperCase();
-            document.getElementById('my-avatar').style.backgroundColor = me.color;
         });
 
         socket.on('update users', (users) => {
@@ -137,17 +106,15 @@
             renderContacts();
         });
 
-        function renderContacts(filter = '') {
-            const cont = document.getElementById('contacts');
-            cont.innerHTML = '';
+        function renderContacts(f = '') {
+            const cont = document.getElementById('contacts'); cont.innerHTML = '';
             for (let id in onlineUsers) {
-                if (id === me.id) continue;
-                if (filter && !id.toLowerCase().includes(filter.toLowerCase())) continue;
+                if (id === me.id || (f && !id.toLowerCase().includes(f.toLowerCase()))) continue;
                 const u = onlineUsers[id];
                 const d = document.createElement('div');
-                d.className = `p-4 rounded-xl cursor-pointer flex items-center transition ${activeChat === id ? 'bg-blue-600/20 border-l-4 border-blue-500' : 'hover:bg-slate-900'}`;
+                d.className = `p-4 rounded-xl cursor-pointer flex items-center mb-1 transition ${activeChat === id ? 'bg-blue-600/20 border-l-4 border-blue-500' : 'hover:bg-slate-900'}`;
                 d.onclick = () => switchChat(id);
-                d.innerHTML = `<div class="w-10 h-10 rounded-full flex items-center justify-center font-bold mr-3 text-white" style="background:${u.color}">${u.nick[0].toUpperCase()}</div><div><p class="text-sm font-bold">${u.nick}</p><p class="text-[9px] opacity-50 font-mono">ID: ${id}</p></div>`;
+                d.innerHTML = `<div class="w-10 h-10 rounded-full flex items-center justify-center mr-3 font-bold text-white shadow-md" style="background:${u.color}">${u.nick[0].toUpperCase()}</div><div><p class="text-sm font-bold text-white">${u.nick}</p><p class="text-[9px] opacity-40 font-mono italic">ID: ${id}</p></div>`;
                 cont.appendChild(d);
             }
         }
@@ -163,14 +130,12 @@
             const title = document.getElementById('chat-title');
             const avatar = document.getElementById('chat-avatar');
             if (target === 'global') {
-                title.innerText = "Global Chat";
-                avatar.innerText = "G";
-                avatar.style.backgroundColor = "#2563eb";
+                title.innerText = "Global Chat"; avatar.innerText = "G"; avatar.style.backgroundColor = "#2563eb";
             } else {
-                title.innerText = onlineUsers[target].nick;
-                avatar.innerText = onlineUsers[target].nick[0].toUpperCase();
-                avatar.style.backgroundColor = onlineUsers[target].color;
+                const u = onlineUsers[target];
+                title.innerText = u.nick; avatar.innerText = u.nick[0].toUpperCase(); avatar.style.backgroundColor = u.color;
             }
+            socket.emit('auth request', { nick: me.nick, id: me.id }); // Просим историю
             renderContacts();
         }
 
@@ -179,48 +144,53 @@
             document.getElementById('chat-window').classList.add('mobile-hidden');
         }
 
-        function toggleSettings() {
-            const m = document.getElementById('settings-modal');
-            m.classList.toggle('hidden');
+        function toggleEmoji() {
+            const box = document.getElementById('emoji-box');
+            box.style.display = box.style.display === 'grid' ? 'none' : 'grid';
         }
 
-        function changeTheme() {
-            isDark = !isDark;
-            document.body.classList.toggle('light-theme');
-            document.getElementById('theme-dot').style.left = isDark ? 'auto' : '4px';
-            document.getElementById('theme-dot').style.right = isDark ? '4px' : 'auto';
+        function addEmoji(e) {
+            document.getElementById('m-input').value += e;
+            toggleEmoji();
         }
 
-        function changeColor(c) {
-            me.color = c;
-            document.getElementById('my-avatar').style.backgroundColor = c;
-        }
+        socket.on('load history', (h) => {
+            const box = document.getElementById('messages'); box.innerHTML = '';
+            h.forEach(m => {
+                if (m.to === activeChat || (m.to === me.id && m.id === activeChat) || (m.id === me.id && m.to === activeChat)) displayMessage(m);
+            });
+        });
 
         document.getElementById('msg-form').onsubmit = (e) => {
             e.preventDefault();
             const inp = document.getElementById('m-input');
             if (inp.value.trim()) {
-                socket.emit('chat message', { user: me.nick, id: me.id, to: activeChat, text: inp.value, color: me.color });
+                socket.emit('chat message', { user: me.nick, id: me.id, to: activeChat, text: inp.value, type: 'text' });
                 inp.value = '';
             }
         };
 
-        socket.on('chat message', (msg) => {
-            // ФИЛЬТР: показывать сообщение только если оно из текущего чата
-            const isMyMsg = msg.id === me.id;
-            const isForGlobal = msg.to === 'global' && activeChat === 'global';
-            const isForMeInPrivate = msg.to === me.id && activeChat === msg.id;
-            const iSentThisPrivate = msg.to === activeChat && isMyMsg && activeChat !== 'global';
+        document.getElementById('file-input').onchange = (e) => {
+            const file = e.target.files[0];
+            const r = new FileReader();
+            r.onload = (ev) => socket.emit('chat message', { user: me.nick, id: me.id, to: activeChat, text: ev.target.result, type: 'image' });
+            r.readAsDataURL(file);
+        };
 
-            if (isForGlobal || isForMeInPrivate || iSentThisPrivate) {
-                const box = document.getElementById('messages');
-                const d = document.createElement('div');
-                d.className = `flex ${isMyMsg ? 'justify-end' : 'justify-start'}`;
-                d.innerHTML = `<div class="max-w-[80%]"><p class="text-[9px] font-bold mb-1 px-1 opacity-50 ${isMyMsg ? 'text-right' : ''}">${msg.user}</p><div class="${isMyMsg ? 'bg-blue-600 text-white' : 'bg-slate-800 border border-slate-700'} px-4 py-2 rounded-2xl shadow-lg text-sm">${msg.text}</div></div>`;
-                box.appendChild(d);
-                box.scrollTop = box.scrollHeight;
-            }
+        socket.on('chat message', (m) => {
+            if (m.to === activeChat || (m.to === me.id && m.id === activeChat) || (m.id === me.id && m.to === activeChat)) displayMessage(m);
         });
+
+        function displayMessage(m) {
+            const isMe = m.id === me.id;
+            const box = document.getElementById('messages');
+            const d = document.createElement('div');
+            d.className = `flex ${isMe ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-1`;
+            let content = m.type === 'image' ? `<img src="${m.text}" class="rounded-xl max-w-full shadow-lg border border-white/10">` : `<p class="text-sm">${m.text}</p>`;
+            d.innerHTML = `<div class="max-w-[85%] md:max-w-[70%]"><p class="text-[9px] opacity-40 mb-1 px-1 ${isMe ? 'text-right' : ''}">${m.user} • ${m.time}</p><div class="${isMe ? 'bg-blue-600 shadow-blue-900/20' : 'bg-slate-800 border border-slate-700'} px-4 py-2.5 rounded-2xl shadow-xl">${content}</div></div>`;
+            box.appendChild(d);
+            box.scrollTop = box.scrollHeight;
+        }
     </script>
 </body>
 </html>
