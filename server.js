@@ -16,13 +16,17 @@ mongoose.connect(uri).then(() => console.log("✅ DB Connected")).catch(err => c
 const MsgSchema = new mongoose.Schema({
     user: String, id: String, to: String, text: String, 
     type: { type: String, default: 'text' }, 
-    time: String, color: String, avatar: String, 
-    deleted: { type: Boolean, default: false }, // Поле для удаления
+    time: String, avatar: String, 
+    deleted: { type: Boolean, default: false },
     date: { type: Date, default: Date.now }
 });
 
 const UserSchema = new mongoose.Schema({
-    id: String, nick: String, avatar: String, theme: String, notifications: Boolean
+    id: { type: String, unique: true },
+    nick: String,
+    password: { type: String, required: true }, // ПОЛЕ ПАРОЛЯ
+    avatar: String,
+    theme: { type: String, default: 'dark' }
 });
 
 const Message = mongoose.model('Message', MsgSchema);
@@ -32,11 +36,19 @@ let onlineUsers = {};
 
 io.on('connection', (socket) => {
     socket.on('auth request', async (data) => {
-        const { id, nick } = data;
+        const { id, nick, password } = data;
+        
         let userDoc = await User.findOne({ id: id });
+        
         if (!userDoc) {
-            userDoc = new User({ id, nick, avatar: '', theme: 'dark', notifications: true });
+            // Если юзера нет — регистрируем с паролем
+            userDoc = new User({ id, nick, password, avatar: '' });
             await userDoc.save();
+        } else {
+            // Если юзер есть — проверяем пароль
+            if (userDoc.password !== password) {
+                return socket.emit('auth error', 'Неверный пароль для этого ID');
+            }
         }
 
         const color = `hsl(${Math.random() * 360}, 70%, 60%)`;
@@ -44,41 +56,27 @@ io.on('connection', (socket) => {
         
         socket.emit('auth success', { nick: userDoc.nick, id: userDoc.id, color, avatar: userDoc.avatar });
 
-        // Грузим только НЕ удаленные сообщения
+        // Быстрая загрузка истории
         const history = await Message.find({ deleted: false }).sort({ date: -1 }).limit(100);
         socket.emit('load history', history.reverse());
         io.emit('update users', onlineUsers);
     });
 
-    // НОВАЯ ФУНКЦИЯ: Удаление сообщения
     socket.on('delete message', async (msgId) => {
-        try {
-            await Message.findByIdAndUpdate(msgId, { deleted: true });
-            io.emit('message deleted', msgId);
-        } catch (e) { console.log(e); }
-    });
-
-    socket.on('update profile', async (data) => {
-        const { oldId, newId, newNick, newAvatar } = data;
-        await User.findOneAndUpdate({ id: oldId }, { id: newId, nick: newNick, avatar: newAvatar });
-        
-        if (onlineUsers[oldId]) {
-            onlineUsers[newId] = { ...onlineUsers[oldId], nick: newNick, avatar: newAvatar };
-            if (oldId !== newId) delete onlineUsers[oldId];
-        }
-        io.emit('update users', onlineUsers);
+        await Message.findByIdAndUpdate(msgId, { deleted: true });
+        io.emit('message deleted', msgId);
     });
 
     socket.on('chat message', async (msg) => {
         msg.time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
-        // Подтягиваем актуальную аву отправителя из базы
-        const sender = await User.findOne({ id: msg.id });
+        // Быстрая отправка в сокет до сохранения в базу (для скорости)
+        const sender = onlineUsers[msg.id];
         if (sender) msg.avatar = sender.avatar;
 
         const newMsg = new Message(msg);
         const saved = await newMsg.save();
-        const finalMsg = saved.toObject(); // Чтобы получить _id сообщения
+        const finalMsg = saved.toObject();
 
         if (msg.to === 'global') {
             io.emit('chat message', finalMsg);
