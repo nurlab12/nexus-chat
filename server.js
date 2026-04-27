@@ -13,14 +13,14 @@ const uri = "mongodb+srv://nurdauletrakhat2012_db_user:merushonok@cluster0.0u9r5
 
 mongoose.connect(uri).then(() => console.log("✅ DB Connected")).catch(err => console.error(err));
 
-// Расширенная схема сообщения
 const MsgSchema = new mongoose.Schema({
     user: String, id: String, to: String, text: String, 
     type: { type: String, default: 'text' }, 
-    time: String, color: String, avatar: String, date: { type: Date, default: Date.now }
+    time: String, color: String, avatar: String, 
+    deleted: { type: Boolean, default: false }, // Поле для удаления
+    date: { type: Date, default: Date.now }
 });
 
-// Схема пользователя (для сохранения настроек)
 const UserSchema = new mongoose.Schema({
     id: String, nick: String, avatar: String, theme: String, notifications: Boolean
 });
@@ -33,8 +33,6 @@ let onlineUsers = {};
 io.on('connection', (socket) => {
     socket.on('auth request', async (data) => {
         const { id, nick } = data;
-        
-        // Ищем юзера в базе или создаем нового
         let userDoc = await User.findOne({ id: id });
         if (!userDoc) {
             userDoc = new User({ id, nick, avatar: '', theme: 'dark', notifications: true });
@@ -46,12 +44,20 @@ io.on('connection', (socket) => {
         
         socket.emit('auth success', { nick: userDoc.nick, id: userDoc.id, color, avatar: userDoc.avatar });
 
-        const history = await Message.find().sort({ date: -1 }).limit(50);
+        // Грузим только НЕ удаленные сообщения
+        const history = await Message.find({ deleted: false }).sort({ date: -1 }).limit(100);
         socket.emit('load history', history.reverse());
         io.emit('update users', onlineUsers);
     });
 
-    // Обновление профиля
+    // НОВАЯ ФУНКЦИЯ: Удаление сообщения
+    socket.on('delete message', async (msgId) => {
+        try {
+            await Message.findByIdAndUpdate(msgId, { deleted: true });
+            io.emit('message deleted', msgId);
+        } catch (e) { console.log(e); }
+    });
+
     socket.on('update profile', async (data) => {
         const { oldId, newId, newNick, newAvatar } = data;
         await User.findOneAndUpdate({ id: oldId }, { id: newId, nick: newNick, avatar: newAvatar });
@@ -65,15 +71,21 @@ io.on('connection', (socket) => {
 
     socket.on('chat message', async (msg) => {
         msg.time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        // Подтягиваем актуальную аву отправителя из базы
+        const sender = await User.findOne({ id: msg.id });
+        if (sender) msg.avatar = sender.avatar;
+
         const newMsg = new Message(msg);
-        await newMsg.save();
+        const saved = await newMsg.save();
+        const finalMsg = saved.toObject(); // Чтобы получить _id сообщения
 
         if (msg.to === 'global') {
-            io.emit('chat message', msg);
+            io.emit('chat message', finalMsg);
         } else {
             const target = onlineUsers[msg.to];
-            if (target) io.to(target.socketId).emit('chat message', msg);
-            socket.emit('chat message', msg);
+            if (target) io.to(target.socketId).emit('chat message', finalMsg);
+            socket.emit('chat message', finalMsg);
         }
     });
 
