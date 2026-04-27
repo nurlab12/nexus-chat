@@ -1,7 +1,6 @@
 {
   "name": "nexuslink-ultra",
-  "version": "2.0.0",
-  "description": "Professional 3D Stealth Horror Inspired Messenger",
+  "version": "2.5.0",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -13,7 +12,5 @@
   },
   "engines": {
     "node": ">=14.0.0"
-  },
-  "author": "Nexus Team",
-  "license": "MIT"
+  }
 }
