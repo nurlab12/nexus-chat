@@ -1,57 +1,81 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
+const mongoose = require('mongoose');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, { 
+    maxHttpBufferSize: 1e8 // Лимит 100мб для фото и видео
+});
 
 app.use(express.static(__dirname));
 
-let usersDB = {}; 
+// ТВОЯ ССЫЛКА С ПАРОЛЕМ (Уже вставлена!)
+const uri = "mongodb+srv://nurdauletrakhat2012_db_user:merushonok@cluster0.0u9r5ql.mongodb.net/nexuslink?retryWrites=true&w=majority";
+
+// Подключение к облаку
+mongoose.connect(uri)
+    .then(() => console.log("✅ Облачная база NexusLink подключена!"))
+    .catch(err => console.error("❌ Ошибка подключения к базе:", err));
+
+// Схема сообщения для базы данных
+const MsgSchema = new mongoose.Schema({
+    user: String,
+    id: String,
+    to: String,
+    text: String,
+    type: { type: String, default: 'text' },
+    time: String,
+    color: String,
+    date: { type: Date, default: Date.now }
+});
+
+const Message = mongoose.model('Message', MsgSchema);
+
 let onlineUsers = {}; 
 
 io.on('connection', (socket) => {
-    socket.on('auth request', (data) => {
+    // Авторизация
+    socket.on('auth request', async (data) => {
         const { nick, id, password } = data;
-        if (!nick || !id || !password) return;
+        const color = `hsl(${Math.random() * 360}, 70%, 60%)`;
+        
+        onlineUsers[id] = { nick, socketId: socket.id, color };
+        socket.emit('auth success', { nick, id, color });
 
-        if (usersDB[id]) {
-            if (usersDB[id].password === password) {
-                login(id, usersDB[id].nick);
-            } else {
-                socket.emit('auth error', 'Неверный пароль!');
-            }
-        } else {
-            usersDB[id] = { nick, password };
-            login(id, nick);
+        try {
+            // Загружаем последние 50 сообщений из облака при входе
+            const history = await Message.find().sort({ date: -1 }).limit(50);
+            socket.emit('load history', history.reverse());
+        } catch (err) {
+            console.error("Ошибка загрузки истории:", err);
         }
 
-        function login(userId, userNick) {
-            const color = `hsl(${Math.random() * 360}, 70%, 60%)`;
-            // Важно: привязываем ID к текущему socket.id
-            onlineUsers[userId] = { nick: userNick, socketId: socket.id, color: color };
-            socket.emit('auth success', { nick: userNick, id: userId, color: color });
-            io.emit('update users', onlineUsers);
-        }
+        io.emit('update users', onlineUsers);
     });
 
-    socket.on('chat message', (msg) => {
+    // Обработка сообщений
+    socket.on('chat message', async (msg) => {
         msg.time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
-        if (msg.to === 'global') {
-            io.emit('chat message', msg);
-        } else {
-            // ЛОГИКА ЛИЧКИ: отправляем отправителю и получателю
-            const target = onlineUsers[msg.to];
-            const sender = onlineUsers[msg.id];
-            
-            if (target) {
-                io.to(target.socketId).emit('chat message', msg);
+        try {
+            // Сохраняем сообщение в MongoDB навсегда
+            const newMsg = new Message(msg);
+            await newMsg.save();
+
+            if (msg.to === 'global') {
+                io.emit('chat message', msg);
+            } else {
+                const target = onlineUsers[msg.to];
+                if (target) {
+                    io.to(target.socketId).emit('chat message', msg);
+                }
+                // Отправляем себе, чтобы сообщение отобразилось в окне лички
+                socket.emit('chat message', msg);
             }
-            // Отправляем себе, чтобы увидеть свое сообщение в окне лички
-            socket.emit('chat message', msg);
+        } catch (err) {
+            console.error("Ошибка сохранения сообщения:", err);
         }
     });
 
@@ -67,4 +91,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`🚀 NexusLink Ultra Fix запущен!`));
+server.listen(PORT, () => console.log(`🚀 NexusLink Ultra Cloud Active на порту ${PORT}`));
