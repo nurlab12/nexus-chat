@@ -15,6 +15,9 @@
         .light-theme { background: #f1f5f9; color: #1e293b; }
         .light-theme .glass { background: white; border: 1px solid #e2e8f0; color: #1e293b; }
         .light-theme #sidebar, .light-theme #chat-window { background: #fff; }
+        /* Стили для удаления */
+        .msg-container:hover .del-icon { opacity: 1; }
+        .del-icon { opacity: 0; cursor: pointer; transition: 0.2s; color: #ef4444; }
     </style>
 </head>
 <body class="h-screen flex flex-col">
@@ -33,7 +36,6 @@
                     </button>
                     <input id="set-av-input" type="file" class="hidden" accept="image/*">
                 </div>
-                <p class="mt-4 text-slate-400 text-sm">Нажмите, чтобы изменить фото</p>
             </div>
             <div class="space-y-4">
                 <div>
@@ -41,7 +43,7 @@
                     <input id="set-nick" type="text" class="w-full bg-slate-900 p-4 rounded-2xl outline-none border border-slate-800 focus:border-blue-600">
                 </div>
                 <div>
-                    <label class="text-xs text-blue-500 font-bold uppercase ml-2">Ваш ID (уникальный)</label>
+                    <label class="text-xs text-blue-500 font-bold uppercase ml-2">Ваш ID</label>
                     <input id="set-id" type="text" class="w-full bg-slate-900 p-4 rounded-2xl outline-none border border-slate-800 focus:border-blue-600">
                 </div>
             </div>
@@ -51,20 +53,20 @@
                     <input type="checkbox" id="set-notif" checked class="w-5 h-5 accent-blue-600">
                 </div>
                 <div class="flex justify-between items-center">
-                    <div class="flex items-center gap-3"><i class="fas fa-moon text-purple-400"></i> Темная тема</div>
+                    <div class="flex items-center gap-3"><i class="fas fa-moon text-purple-400"></i> Тема</div>
                     <button onclick="toggleTheme()" class="bg-blue-600 px-4 py-1 rounded-full text-xs">Переключить</button>
                 </div>
             </div>
-            <button onclick="saveSettings()" class="w-full bg-blue-600 py-4 rounded-2xl font-black shadow-xl hover:scale-[1.02] transition">СОХРАНИТЬ ИЗМЕНЕНИЯ</button>
+            <button onclick="saveSettings()" class="w-full bg-blue-600 py-4 rounded-2xl font-black transition">СОХРАНИТЬ</button>
         </div>
     </div>
 
     <div id="auth-screen" class="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a] p-4">
         <div class="glass p-8 rounded-3xl w-full max-w-sm text-center">
             <h1 class="text-3xl font-black italic mb-6">NEXUS<span class="text-blue-500 text-4xl">LINK</span></h1>
-            <input id="in-nick" type="text" placeholder="Ник" class="w-full bg-slate-900 mb-3 rounded-xl px-4 py-3 text-white outline-none border border-slate-700">
-            <input id="in-id" type="text" placeholder="ID" class="w-full bg-slate-900 mb-6 rounded-xl px-4 py-3 text-white outline-none border border-slate-700">
-            <button onclick="auth()" class="w-full bg-blue-600 py-4 rounded-xl font-black shadow-lg">ВОЙТИ</button>
+            <input id="in-nick" type="text" placeholder="Ник" class="w-full bg-slate-900 mb-3 rounded-xl px-4 py-3 outline-none border border-slate-700">
+            <input id="in-id" type="text" placeholder="ID" class="w-full bg-slate-900 mb-6 rounded-xl px-4 py-3 outline-none border border-slate-700">
+            <button onclick="auth()" class="w-full bg-blue-600 py-4 rounded-xl font-black">ВОЙТИ</button>
         </div>
     </div>
 
@@ -95,6 +97,7 @@
                 </div>
             </div>
             <div id="messages" class="flex-1 overflow-y-auto p-6 space-y-4"></div>
+            
             <form id="msg-form" class="p-4 max-w-4xl mx-auto w-full flex gap-2">
                 <div class="flex-1 glass flex items-center px-4 py-2 rounded-2xl">
                     <button type="button" onclick="document.getElementById('file-input').click()" class="text-slate-500 mr-3"><i class="fas fa-paperclip"></i></button>
@@ -122,52 +125,36 @@
             me = data;
             document.getElementById('auth-screen').classList.add('hidden');
             document.getElementById('app-screen').classList.remove('hidden');
-            
-            // Заполняем настройки данными из базы
             document.getElementById('set-nick').value = me.nick;
             document.getElementById('set-id').value = me.id;
             if (me.avatar) document.getElementById('set-av-preview').src = me.avatar;
         });
 
-        function toggleSettings() {
-            document.getElementById('settings-page').classList.toggle('settings-active');
-        }
-
+        function toggleSettings() { document.getElementById('settings-page').classList.toggle('settings-active'); }
         function toggleTheme() {
             document.body.classList.toggle('light-theme');
             me.theme = document.body.classList.contains('light-theme') ? 'light' : 'dark';
         }
 
-        // Обработка новой аватарки в настройках
         document.getElementById('set-av-input').onchange = (e) => {
-            const file = e.target.files[0];
             const r = new FileReader();
             r.onload = (ev) => {
                 document.getElementById('set-av-preview').src = ev.target.result;
                 me.avatar = ev.target.result;
             };
-            r.readAsDataURL(file);
+            r.readAsDataURL(e.target.files[0]);
         };
 
         function saveSettings() {
             const newNick = document.getElementById('set-nick').value;
             const newId = document.getElementById('set-id').value;
-            socket.emit('update profile', { 
-                oldId: me.id, 
-                newId: newId, 
-                newNick: newNick, 
-                newAvatar: me.avatar 
-            });
-            me.id = newId;
-            me.nick = newNick;
+            socket.emit('update profile', { oldId: me.id, newId, newNick, newAvatar: me.avatar });
+            me.id = newId; me.nick = newNick;
             alert("Профиль обновлен!");
             toggleSettings();
         }
 
-        socket.on('update users', (users) => {
-            onlineUsers = users;
-            renderContacts();
-        });
+        socket.on('update users', (users) => { onlineUsers = users; renderContacts(); });
 
         function renderContacts(f = '') {
             const cont = document.getElementById('contacts'); cont.innerHTML = '';
@@ -176,7 +163,7 @@
                 const u = onlineUsers[id];
                 const avatarImg = u.avatar ? `<img src="${u.avatar}" class="w-full h-full object-cover">` : u.nick[0].toUpperCase();
                 cont.innerHTML += `<div onclick="switchChat('${id}')" class="p-4 rounded-xl cursor-pointer flex items-center mb-1 ${activeChat === id ? 'bg-blue-600/20' : 'hover:bg-slate-900'}">
-                    <div class="w-10 h-10 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center mr-3 font-bold text-white">${avatarImg}</div>
+                    <div class="w-10 h-10 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center mr-3 font-bold">${avatarImg}</div>
                     <div><p class="text-sm font-bold">${u.nick}</p><p class="text-[9px] opacity-40">ID: ${id}</p></div>
                 </div>`;
             }
@@ -186,10 +173,27 @@
             activeChat = t;
             if (window.innerWidth < 768) { closeChat(); document.getElementById('chat-window').classList.remove('mobile-hidden'); }
             document.getElementById('messages').innerHTML = '';
-            const u = onlineUsers[t];
-            document.getElementById('chat-title').innerText = t === 'global' ? "Global Chat" : u.nick;
+            const title = document.getElementById('chat-title');
+            const avatar = document.getElementById('chat-avatar');
+            if (t === 'global') {
+                title.innerText = "Global Chat";
+                avatar.innerHTML = 'G';
+            } else {
+                const u = onlineUsers[t];
+                title.innerText = u.nick;
+                avatar.innerHTML = u.avatar ? `<img src="${u.avatar}" class="w-full h-full object-cover">` : u.nick[0].toUpperCase();
+            }
             socket.emit('auth request', { nick: me.nick, id: me.id });
         }
+
+        // ТВОЙ ФУНКЦИОНАЛ ОТПРАВКИ ФАЙЛА
+        document.getElementById('file-input').onchange = (e) => {
+            const r = new FileReader();
+            r.onload = (ev) => {
+                socket.emit('chat message', { user: me.nick, id: me.id, to: activeChat, text: ev.target.result, type: 'image', avatar: me.avatar });
+            };
+            r.readAsDataURL(e.target.files[0]);
+        };
 
         socket.on('load history', (h) => {
             const box = document.getElementById('messages'); box.innerHTML = '';
@@ -202,7 +206,7 @@
             e.preventDefault();
             const inp = document.getElementById('m-input');
             if (inp.value.trim()) {
-                socket.emit('chat message', { user: me.nick, id: me.id, to: activeChat, text: inp.value, avatar: me.avatar });
+                socket.emit('chat message', { user: me.nick, id: me.id, to: activeChat, text: inp.value, type: 'text', avatar: me.avatar });
                 inp.value = '';
             }
         };
@@ -215,25 +219,37 @@
             const isMe = m.id === me.id;
             const box = document.getElementById('messages');
             const d = document.createElement('div');
-            d.className = `flex ${isMe ? 'justify-end' : 'justify-start'} mb-2`;
+            d.id = `msg-${m._id}`;
+            d.className = `flex ${isMe ? 'justify-end' : 'justify-start'} mb-2 msg-container`;
             
             const av = m.avatar ? `<img src="${m.avatar}" class="w-6 h-6 rounded-full object-cover">` : `<div class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-[10px]">${m.user[0]}</div>`;
             
-            d.innerHTML = `<div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[80%]">
+            d.innerHTML = `<div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[80%] relative">
                 <div class="flex items-center gap-2 mb-1">
                     ${!isMe ? av : ''}
                     <span class="text-[10px] opacity-50">${m.user}</span>
                     ${isMe ? av : ''}
                 </div>
-                <div class="${isMe ? 'bg-blue-600' : 'bg-slate-800'} px-4 py-2 rounded-2xl text-sm">${m.text}</div>
+                <div class="flex items-center gap-2">
+                    ${isMe ? `<i onclick="deleteMsg('${m._id}')" class="fas fa-trash-alt del-icon text-[10px]"></i>` : ''}
+                    <div class="${isMe ? 'bg-blue-600 shadow-lg' : 'bg-slate-800'} px-4 py-2 rounded-2xl text-sm">
+                        ${m.type === 'image' ? `<img src="${m.text}" class="rounded-lg max-w-full">` : m.text}
+                    </div>
+                </div>
+                <span class="text-[8px] opacity-20 mt-1">${m.time}</span>
             </div>`;
             box.appendChild(d);
             box.scrollTop = box.scrollHeight;
         }
 
-        function closeChat() {
-            document.getElementById('chat-window').classList.add('mobile-hidden');
-        }
+        function deleteMsg(id) { if(confirm("Удалить сообщение?")) socket.emit('delete message', id); }
+
+        socket.on('message deleted', (id) => {
+            const el = document.getElementById(`msg-${id}`);
+            if (el) el.remove();
+        });
+
+        function closeChat() { document.getElementById('chat-window').classList.add('mobile-hidden'); }
     </script>
 </body>
 </html>
