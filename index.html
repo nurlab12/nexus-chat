@@ -3,32 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>NexusLink v3.5</title>
+    <title>NexusLink v3.6</title>
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <style>
-        body { background: #0b0e14; color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
+        body { background: #0b0e14; color: white; font-family: 'Inter', sans-serif; height: 100vh; width: 100vw; overflow: hidden; }
         .glass { background: rgba(22, 27, 34, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
         
-        /* Стили для удаления */
-        .msg-container:hover .del-icon { opacity: 1; }
-        .del-icon { opacity: 0; transition: 0.2s; cursor: pointer; color: #ef4444; }
+        /* Скроллбар для красоты */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
 
-        /* МОБИЛЬНАЯ ЛОГИКА */
+        /* Окно настроек */
+        #settings-screen { 
+            transform: translateX(100%); 
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+        }
+        #settings-screen.active { transform: translateX(0); }
+
+        /* Мобильная адаптация */
         @media (max-width: 768px) {
             .mobile-hide { display: none !important; }
-            #sidebar { width: 100%; }
+            #sidebar { width: 100% !important; height: 100%; }
             #chat-window { 
                 position: fixed; 
                 inset: 0; 
-                z-index: 50; 
-                background: #0b0e14;
+                z-index: 40; 
+                width: 100%;
+                height: 100%;
             }
         }
+
+        .msg-container:hover .del-icon { opacity: 1; }
+        .del-icon { opacity: 0; transition: 0.2s; cursor: pointer; color: #ef4444; }
     </style>
 </head>
-<body class="h-screen flex flex-col">
+<body class="flex flex-col">
 
     <div id="auth-screen" class="fixed inset-0 z-[200] flex items-center justify-center bg-[#0b0e14] p-4">
         <div class="glass p-8 rounded-[40px] w-full max-w-sm text-center">
@@ -37,47 +49,57 @@
             <input id="in-nick" type="text" placeholder="Ваш Ник" class="w-full bg-slate-900 rounded-2xl px-5 py-4 mb-3 outline-none border border-white/5">
             <input id="in-id" type="text" placeholder="Уникальный ID" class="w-full bg-slate-900 rounded-2xl px-5 py-4 mb-3 outline-none border border-white/5">
             <input id="in-pass" type="password" placeholder="Пароль" class="w-full bg-slate-900 rounded-2xl px-5 py-4 mb-8 outline-none border border-white/5">
-            <button onclick="auth()" class="w-full bg-blue-600 py-4 rounded-2xl font-black shadow-lg shadow-blue-900/20 active:scale-95 transition">ВОЙТИ / СОЗДАТЬ</button>
+            <button onclick="auth()" class="w-full bg-blue-600 py-4 rounded-2xl font-black shadow-lg shadow-blue-900/20 active:scale-95 transition">ВОЙТИ</button>
         </div>
     </div>
 
-    <div id="app-screen" class="hidden h-screen flex">
+    <div id="settings-screen" class="fixed inset-0 z-[100] bg-[#0b0e14] p-6 flex flex-col">
+        <div class="flex items-center gap-4 mb-8">
+            <button onclick="toggleSettings()" class="text-2xl"><i class="fas fa-arrow-left"></i></button>
+            <h2 class="text-2xl font-bold">Настройки</h2>
+        </div>
+        <div class="space-y-6">
+            <div class="glass p-4 rounded-2xl">
+                <p class="text-sm opacity-50 mb-2">Ваш профиль</p>
+                <p id="profile-info" class="font-bold text-lg">Загрузка...</p>
+            </div>
+            <button onclick="location.reload()" class="w-full bg-red-600/20 text-red-500 py-4 rounded-2xl font-bold border border-red-600/30">ВЫЙТИ ИЗ АККАУНТА</button>
+        </div>
+    </div>
+
+    <div id="app-screen" class="hidden h-screen flex overflow-hidden">
         
-        <div id="sidebar" class="w-full md:w-80 border-r border-white/5 flex flex-col">
+        <div id="sidebar" class="w-full md:w-80 border-r border-white/5 flex flex-col shrink-0 bg-[#0b0e14]">
             <div class="p-5 flex justify-between items-center border-b border-white/5">
                 <span class="text-xl font-black italic text-blue-500">NEXUS</span>
-                <button class="opacity-50"><i class="fas fa-bars"></i></button>
+                <button onclick="toggleSettings()" class="w-10 h-10 glass rounded-xl flex items-center justify-center"><i class="fas fa-cog"></i></button>
             </div>
-            <div id="contacts" class="flex-1 overflow-y-auto p-2 space-y-1">
-                <div onclick="switchChat('global')" id="chat-global" class="p-4 rounded-2xl cursor-pointer flex items-center hover:bg-white/5 border-l-4 border-blue-500 mb-2">
-                    <div class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center mr-3"><i class="fas fa-globe"></i></div>
-                    <p class="font-bold text-sm">Global Chat</p>
+            <div id="contacts-scroll" class="flex-1 overflow-y-auto p-2">
+                <div onclick="switchChat('global')" class="p-4 rounded-2xl cursor-pointer flex items-center hover:bg-white/5 transition mb-1 border-l-4 border-blue-600 bg-blue-600/5">
+                    <div class="w-11 h-11 bg-blue-600 rounded-full flex items-center justify-center mr-3 shadow-lg shadow-blue-600/20"><i class="fas fa-globe"></i></div>
+                    <p class="font-bold text-sm">Общий чат</p>
                 </div>
-                <div id="user-list"></div>
+                <div id="user-list" class="space-y-1"></div>
             </div>
         </div>
 
         <div id="chat-window" class="mobile-hide flex-1 flex flex-col bg-[#0b0e14]">
-            <div class="p-4 glass flex items-center justify-between border-b border-white/5">
-                <div class="flex items-center gap-3">
-                    <button onclick="closeChat()" class="md:hidden text-blue-500 text-xl pr-2"><i class="fas fa-arrow-left"></i></button>
-                    <div id="chat-avatar" class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold">G</div>
-                    <div>
-                        <h2 id="chat-title" class="font-bold text-sm leading-none">Global Chat</h2>
-                        <span class="text-[10px] opacity-40">online</span>
-                    </div>
-                </div>
+            <div class="p-4 glass flex items-center border-b border-white/5 z-10">
+                <button onclick="closeChat()" class="md:hidden text-blue-500 text-xl mr-4"><i class="fas fa-arrow-left"></i></button>
+                <div id="chat-avatar" class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold mr-3">G</div>
+                <h2 id="chat-title" class="font-bold text-sm">Global Chat</h2>
             </div>
 
-            <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4"></div>
+            <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#0b0e14]">
+                </div>
 
-            <form id="msg-form" class="p-4 max-w-4xl mx-auto w-full flex gap-2">
-                <div class="flex-1 glass flex items-center px-4 py-2 rounded-2xl">
-                    <button type="button" onclick="document.getElementById('file-input').click()" class="text-slate-500 mr-3 hover:text-blue-500 transition"><i class="fas fa-paperclip"></i></button>
+            <form id="msg-form" class="p-4 w-full flex gap-2 glass">
+                <div class="flex-1 bg-slate-900 flex items-center px-4 py-2 rounded-2xl border border-white/5">
+                    <button type="button" onclick="document.getElementById('file-input').click()" class="text-slate-500 mr-3 hover:text-blue-500"><i class="fas fa-paperclip"></i></button>
                     <input id="file-input" type="file" class="hidden" accept="image/*">
                     <input id="m-input" autocomplete="off" placeholder="Сообщение..." class="flex-1 bg-transparent text-sm outline-none">
                 </div>
-                <button class="bg-blue-600 w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg shadow-blue-900/30 active:scale-90 transition"><i class="fas fa-paper-plane"></i></button>
+                <button class="bg-blue-600 w-12 h-12 rounded-2xl flex items-center justify-center active:scale-90 transition shadow-lg shadow-blue-600/20"><i class="fas fa-paper-plane"></i></button>
             </form>
         </div>
     </div>
@@ -106,6 +128,7 @@
             me = data;
             document.getElementById('auth-screen').classList.add('hidden');
             document.getElementById('app-screen').classList.remove('hidden');
+            document.getElementById('profile-info').innerText = `${me.nick} (@${me.id})`;
         });
 
         socket.on('update users', (users) => {
@@ -120,29 +143,27 @@
                 if (id === me.id) continue;
                 const u = onlineUsers[id];
                 const av = u.avatar ? `<img src="${u.avatar}" class="w-full h-full object-cover">` : u.nick[0];
-                cont.innerHTML += `<div onclick="switchChat('${id}')" class="p-4 rounded-2xl cursor-pointer flex items-center ${activeChat === id ? 'bg-blue-600/20' : 'hover:bg-white/5'} transition">
-                    <div class="w-10 h-10 rounded-full overflow-hidden bg-blue-600 flex items-center justify-center mr-3 font-bold">${av}</div>
-                    <div><p class="text-sm font-bold">${u.nick}</p><p class="text-[10px] opacity-30">Нажмите, чтобы открыть чат</p></div>
+                cont.innerHTML += `<div onclick="switchChat('${id}')" class="p-4 rounded-2xl cursor-pointer flex items-center hover:bg-white/5 transition">
+                    <div class="w-11 h-11 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center mr-3 font-bold border border-white/5">${av}</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold truncate">${u.nick}</p>
+                        <p class="text-[10px] text-green-500">онлайн</p>
+                    </div>
                 </div>`;
             }
         }
 
-        // ПЕРЕКЛЮЧЕНИЕ ЧАТА (с мобильной логикой)
         function switchChat(t) {
             activeChat = t;
-            
-            // Если на телефоне — скрываем список, показываем чат
             if (window.innerWidth < 768) {
                 document.getElementById('sidebar').classList.add('mobile-hide');
                 document.getElementById('chat-window').classList.remove('mobile-hide');
             }
-            
             renderMessages();
-            
             const title = document.getElementById('chat-title');
             const avatar = document.getElementById('chat-avatar');
             if (t === 'global') {
-                title.innerText = "Global Chat";
+                title.innerText = "Общий чат";
                 avatar.innerHTML = 'G';
             } else {
                 const u = onlineUsers[t];
@@ -151,16 +172,16 @@
             }
         }
 
-        // ВЫХОД ИЗ ЧАТА В СПИСОК (для телефона)
         function closeChat() {
             document.getElementById('sidebar').classList.remove('mobile-hide');
             document.getElementById('chat-window').classList.add('mobile-hide');
         }
 
-        socket.on('load history', (h) => {
-            messageCache = h;
-            renderMessages();
-        });
+        function toggleSettings() {
+            document.getElementById('settings-screen').classList.toggle('active');
+        }
+
+        socket.on('load history', (h) => { messageCache = h; renderMessages(); });
 
         socket.on('chat message', (m) => {
             messageCache.push(m);
@@ -194,10 +215,10 @@
                 <div class="flex items-center gap-2 mb-1">
                     ${!isMe ? av : ''} <span class="text-[10px] opacity-50">${m.user}</span> ${isMe ? av : ''}
                 </div>
-                <div class="flex items-center gap-2 group">
+                <div class="flex items-center gap-2">
                     ${isMe ? `<i onclick="deleteMsg('${m._id}')" class="fas fa-trash-alt del-icon text-[10px]"></i>` : ''}
-                    <div class="${isMe ? 'bg-blue-600 shadow-lg shadow-blue-900/20' : 'bg-slate-800'} px-4 py-2 rounded-2xl text-sm">
-                        ${m.text.startsWith('data:image') ? `<img src="${m.text}" class="rounded-lg max-w-full">` : m.text}
+                    <div class="${isMe ? 'bg-blue-600 shadow-lg shadow-blue-600/20' : 'bg-slate-800'} px-4 py-2 rounded-2xl text-sm">
+                        ${m.text.startsWith('data:image') ? `<img src="${m.text}" class="rounded-lg">` : m.text}
                     </div>
                 </div>
             </div>`;
@@ -205,9 +226,7 @@
             box.scrollTop = box.scrollHeight;
         }
 
-        function deleteMsg(id) { 
-            if(confirm("Удалить сообщение?")) socket.emit('delete message', id); 
-        }
+        function deleteMsg(id) { if(confirm("Удалить?")) socket.emit('delete message', id); }
 
         socket.on('message deleted', (id) => {
             messageCache = messageCache.filter(m => m._id !== id);
