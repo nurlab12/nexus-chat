@@ -10,23 +10,15 @@
     <style>
         body { background: #0b0e14; color: white; font-family: 'Inter', sans-serif; height: 100vh; width: 100vw; overflow: hidden; }
         .glass { background: rgba(22, 27, 34, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.05); }
-        
         ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
-
-        #settings-screen { 
-            transform: translateX(100%); 
-            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
-        }
+        #settings-screen { transform: translateX(100%); transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
         #settings-screen.active { transform: translateX(0); }
-
         @media (max-width: 768px) {
             .mobile-hide { display: none !important; }
             #sidebar { width: 100% !important; height: 100%; }
             #chat-window { position: fixed; inset: 0; z-index: 40; width: 100%; height: 100%; }
         }
-
         .msg-container:hover .del-icon { opacity: 1; }
         .del-icon { opacity: 0; transition: 0.2s; cursor: pointer; color: #ef4444; }
     </style>
@@ -40,20 +32,24 @@
             <input id="in-nick" type="text" placeholder="Ваш Ник" class="w-full bg-slate-900 rounded-2xl px-5 py-4 mb-3 outline-none border border-white/5">
             <input id="in-id" type="text" placeholder="Уникальный ID" class="w-full bg-slate-900 rounded-2xl px-5 py-4 mb-3 outline-none border border-white/5">
             <input id="in-pass" type="password" placeholder="Пароль" class="w-full bg-slate-900 rounded-2xl px-5 py-4 mb-8 outline-none border border-white/5">
-            <button onclick="auth()" class="w-full bg-blue-600 py-4 rounded-2xl font-black shadow-lg shadow-blue-900/20 active:scale-95 transition">ВОЙТИ</button>
+            <button onclick="auth()" class="w-full bg-blue-600 py-4 rounded-2xl font-black transition">ВОЙТИ</button>
+        </div>
+    </div>
+
+    <div id="call-screen" class="hidden fixed inset-0 z-[300] bg-black flex flex-col items-center justify-center p-6">
+        <div class="relative w-full max-w-lg aspect-video bg-slate-900 rounded-[30px] overflow-hidden">
+            <video id="remote-video" autoplay playsinline class="w-full h-full object-cover"></video>
+            <video id="local-video" autoplay playsinline muted class="absolute bottom-4 right-4 w-32 aspect-video bg-black rounded-xl border border-white/20 object-cover"></video>
+        </div>
+        <div class="mt-8 flex gap-6">
+            <button onclick="endCall()" class="w-16 h-16 bg-red-600 rounded-full flex items-center justify-center text-2xl"><i class="fas fa-phone-slash"></i></button>
         </div>
     </div>
 
     <div id="settings-screen" class="fixed inset-0 z-[100] bg-[#0b0e14] p-6 flex flex-col">
-        <div class="flex items-center gap-4 mb-8">
-            <button onclick="toggleSettings()" class="text-2xl"><i class="fas fa-arrow-left"></i></button>
-            <h2 class="text-2xl font-bold">Настройки</h2>
-        </div>
+        <div class="flex items-center gap-4 mb-8"><button onclick="toggleSettings()" class="text-2xl"><i class="fas fa-arrow-left"></i></button><h2 class="text-2xl font-bold">Настройки</h2></div>
         <div class="space-y-6">
-            <div class="glass p-4 rounded-2xl">
-                <p class="text-sm opacity-50 mb-2">Ваш профиль</p>
-                <p id="profile-info" class="font-bold text-lg">Загрузка...</p>
-            </div>
+            <div class="glass p-4 rounded-2xl"><p class="text-sm opacity-50 mb-2">Ваш профиль</p><p id="profile-info" class="font-bold text-lg">Загрузка...</p></div>
             <button onclick="logout()" class="w-full bg-red-600/20 text-red-500 py-4 rounded-2xl font-bold border border-red-600/30">ВЫЙТИ ИЗ АККАУНТА</button>
         </div>
     </div>
@@ -64,47 +60,45 @@
                 <span class="text-xl font-black italic text-blue-500">NEXUS</span>
                 <button onclick="toggleSettings()" class="w-10 h-10 glass rounded-xl flex items-center justify-center"><i class="fas fa-cog"></i></button>
             </div>
-            <div id="contacts-scroll" class="flex-1 overflow-y-auto p-2">
-                <div onclick="switchChat('global')" class="p-4 rounded-2xl cursor-pointer flex items-center hover:bg-white/5 transition mb-1 border-l-4 border-blue-600 bg-blue-600/5">
-                    <div class="w-11 h-11 bg-blue-600 rounded-full flex items-center justify-center mr-3 shadow-lg shadow-blue-600/20"><i class="fas fa-globe"></i></div>
-                    <p class="font-bold text-sm">Общий чат</p>
-                </div>
-                <div id="user-list" class="space-y-1"></div>
-            </div>
+            <div id="user-list" class="flex-1 overflow-y-auto p-2"></div>
         </div>
 
         <div id="chat-window" class="mobile-hide flex-1 flex flex-col bg-[#0b0e14]">
-            <div class="p-4 glass flex items-center border-b border-white/5 z-10">
-                <button onclick="closeChat()" class="md:hidden text-blue-500 text-xl mr-4"><i class="fas fa-arrow-left"></i></button>
-                <div id="chat-avatar" class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold mr-3">G</div>
-                <h2 id="chat-title" class="font-bold text-sm">Global Chat</h2>
+            <div class="p-4 glass flex justify-between items-center border-b border-white/5 z-10">
+                <div class="flex items-center">
+                    <button onclick="closeChat()" class="md:hidden text-blue-500 text-xl mr-4"><i class="fas fa-arrow-left"></i></button>
+                    <div id="chat-avatar" class="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold mr-3">G</div>
+                    <h2 id="chat-title" class="font-bold text-sm">Global Chat</h2>
+                </div>
+                <div id="call-buttons" class="hidden flex gap-4 text-slate-400">
+                    <button onclick="startCall(false)" class="hover:text-green-500 p-2"><i class="fas fa-phone"></i></button>
+                    <button onclick="startCall(true)" class="hover:text-blue-500 p-2"><i class="fas fa-video"></i></button>
+                </div>
             </div>
             <div id="messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-[#0b0e14]"></div>
             <form id="msg-form" class="p-4 w-full flex gap-2 glass">
-                <div class="flex-1 bg-slate-900 flex items-center px-4 py-2 rounded-2xl border border-white/5">
-                    <button type="button" onclick="document.getElementById('file-input').click()" class="text-slate-500 mr-3 hover:text-blue-500"><i class="fas fa-paperclip"></i></button>
+                <div class="flex-1 bg-slate-900 flex items-center px-4 py-2 rounded-2xl">
+                    <button type="button" onclick="document.getElementById('file-input').click()" class="text-slate-500 mr-3"><i class="fas fa-paperclip"></i></button>
                     <input id="file-input" type="file" class="hidden" accept="image/*">
-                    <input id="m-input" autocomplete="off" placeholder="Сообщение..." class="flex-1 bg-transparent text-sm outline-none">
+                    <input id="m-input" autocomplete="off" placeholder="Сообщение..." class="flex-1 bg-transparent outline-none">
                 </div>
-                <button class="bg-blue-600 w-12 h-12 rounded-2xl flex items-center justify-center active:scale-90 transition shadow-lg shadow-blue-600/20"><i class="fas fa-paper-plane"></i></button>
+                <button class="bg-blue-600 w-12 h-12 rounded-2xl flex items-center justify-center"><i class="fas fa-paper-plane"></i></button>
             </form>
         </div>
     </div>
 
     <script>
         const socket = io();
-        let me = { nick: '', id: '', avatar: '' };
+        let me = { nick: '', id: '' };
         let activeChat = 'global';
         let onlineUsers = {};
         let messageCache = [];
+        let localStream, peerConnection;
+        const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
-        // Авто-логин при загрузке
         window.onload = () => {
             const saved = localStorage.getItem('nexus_user');
-            if (saved) {
-                const { nick, id, password } = JSON.parse(saved);
-                socket.emit('auth request', { nick, id, password });
-            }
+            if (saved) socket.emit('auth request', JSON.parse(saved));
         };
 
         function auth() {
@@ -117,17 +111,7 @@
             }
         }
 
-        function logout() {
-            localStorage.removeItem('nexus_user');
-            location.reload();
-        }
-
-        socket.on('auth error', (err) => {
-            localStorage.removeItem('nexus_user');
-            const errDiv = document.getElementById('auth-error');
-            errDiv.innerText = err;
-            errDiv.classList.remove('hidden');
-        });
+        function logout() { localStorage.removeItem('nexus_user'); location.reload(); }
 
         socket.on('auth success', (data) => {
             me = data;
@@ -136,24 +120,19 @@
             document.getElementById('profile-info').innerText = `${me.nick} (@${me.id})`;
         });
 
-        socket.on('update users', (users) => {
-            onlineUsers = users;
-            renderContacts();
-        });
+        socket.on('update users', (users) => { onlineUsers = users; renderContacts(); });
 
         function renderContacts() {
             const cont = document.getElementById('user-list');
-            cont.innerHTML = '';
+            cont.innerHTML = `<div onclick="switchChat('global')" class="p-4 rounded-2xl cursor-pointer flex items-center hover:bg-white/5 transition mb-1 border-l-4 border-blue-600 bg-blue-600/5">
+                <div class="w-11 h-11 bg-blue-600 rounded-full flex items-center justify-center mr-3 shadow-lg shadow-blue-600/20"><i class="fas fa-globe"></i></div>
+                <p class="font-bold text-sm">Общий чат</p></div>`;
             for (let id in onlineUsers) {
                 if (id === me.id) continue;
                 const u = onlineUsers[id];
-                const av = u.avatar ? `<img src="${u.avatar}" class="w-full h-full object-cover">` : u.nick[0];
                 cont.innerHTML += `<div onclick="switchChat('${id}')" class="p-4 rounded-2xl cursor-pointer flex items-center hover:bg-white/5 transition">
-                    <div class="w-11 h-11 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center mr-3 font-bold border border-white/5">${av}</div>
-                    <div class="flex-1 min-w-0">
-                        <p class="text-sm font-bold truncate">${u.nick}</p>
-                        <p class="text-[10px] text-green-500">онлайн</p>
-                    </div>
+                    <div class="w-11 h-11 rounded-full bg-slate-800 flex items-center justify-center mr-3 border border-white/5 font-bold">${u.nick[0]}</div>
+                    <div class="flex-1 min-w-0"><p class="text-sm font-bold truncate">${u.nick}</p><p class="text-[10px] text-green-500">онлайн</p></div>
                 </div>`;
             }
         }
@@ -164,46 +143,68 @@
                 document.getElementById('sidebar').classList.add('mobile-hide');
                 document.getElementById('chat-window').classList.remove('mobile-hide');
             }
+            document.getElementById('call-buttons').classList.toggle('hidden', t === 'global');
             renderMessages();
-            const title = document.getElementById('chat-title');
-            const avatar = document.getElementById('chat-avatar');
-            if (t === 'global') {
-                title.innerText = "Общий чат";
-                avatar.innerHTML = 'G';
-            } else {
-                const u = onlineUsers[t];
-                title.innerText = u ? u.nick : t;
-                avatar.innerHTML = u && u.avatar ? `<img src="${u.avatar}" class="w-full h-full object-cover">` : (u ? u.nick[0] : '?');
-            }
+            const u = onlineUsers[t];
+            document.getElementById('chat-title').innerText = t === 'global' ? "Общий чат" : (u ? u.nick : t);
         }
 
-        function closeChat() {
-            document.getElementById('sidebar').classList.remove('mobile-hide');
-            document.getElementById('chat-window').classList.add('mobile-hide');
+        async function startCall(video) {
+            try {
+                localStream = await navigator.mediaDevices.getUserMedia({ video, audio: true });
+                document.getElementById('local-video').srcObject = localStream;
+                document.getElementById('call-screen').classList.remove('hidden');
+                socket.emit('call-request', { to: activeChat, video });
+            } catch (e) { alert("Камера недоступна"); }
         }
 
-        function toggleSettings() {
-            document.getElementById('settings-screen').classList.toggle('active');
-        }
-
-        socket.on('load history', (h) => { messageCache = h; renderMessages(); });
-
-        socket.on('chat message', (m) => {
-            messageCache.push(m);
-            if (m.to === activeChat || m.id === activeChat || (m.to === me.id && m.id === activeChat)) {
-                displayMessage(m);
-            }
+        socket.on('incoming-call', async (data) => {
+            if (confirm(`Звонок от ${data.from_nick}. Ответить?`)) {
+                document.getElementById('call-screen').classList.remove('hidden');
+                localStream = await navigator.mediaDevices.getUserMedia({ video: data.video, audio: true });
+                document.getElementById('local-video').srcObject = localStream;
+                createPeer(data.from);
+                localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+                const offer = await peerConnection.createOffer();
+                await peerConnection.setLocalDescription(offer);
+                socket.emit('call-offer', { to: data.from, offer });
+            } else { socket.emit('end-call', { to: data.from }); }
         });
 
+        function createPeer(target) {
+            peerConnection = new RTCPeerConnection(rtcConfig);
+            peerConnection.onicecandidate = (e) => { if (e.candidate) socket.emit('ice-candidate', { to: target, candidate: e.candidate }); };
+            peerConnection.ontrack = (e) => { document.getElementById('remote-video').srcObject = e.streams[0]; };
+        }
+
+        socket.on('call-offer', async (data) => {
+            createPeer(data.from);
+            localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
+            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+            const ans = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(ans);
+            socket.emit('call-answer', { to: data.from, answer: ans });
+        });
+
+        socket.on('call-answer', (data) => peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer)));
+        socket.on('ice-candidate', (data) => peerConnection && peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)));
+        socket.on('end-call', endCall);
+
+        function endCall() {
+            if (localStream) localStream.getTracks().forEach(t => t.stop());
+            if (peerConnection) peerConnection.close();
+            document.getElementById('call-screen').classList.add('hidden');
+            socket.emit('end-call', { to: activeChat });
+        }
+
+        function closeChat() { document.getElementById('sidebar').classList.remove('mobile-hide'); document.getElementById('chat-window').classList.add('mobile-hide'); }
+        function toggleSettings() { document.getElementById('settings-screen').classList.toggle('active'); }
+        socket.on('load history', (h) => { messageCache = h; renderMessages(); });
+        socket.on('chat message', (m) => { messageCache.push(m); if (m.to === activeChat || m.id === activeChat || (m.to === me.id && m.id === activeChat)) displayMessage(m); });
+        
         function renderMessages() {
-            const box = document.getElementById('messages');
-            box.innerHTML = '';
-            const filtered = messageCache.filter(m => 
-                (activeChat === 'global' && m.to === 'global') ||
-                (m.to === activeChat && m.id === me.id) ||
-                (m.to === me.id && m.id === activeChat)
-            );
-            filtered.forEach(displayMessage);
+            const box = document.getElementById('messages'); box.innerHTML = '';
+            messageCache.filter(m => (activeChat === 'global' && m.to === 'global') || (m.to === activeChat && m.id === me.id) || (m.to === me.id && m.id === activeChat)).forEach(displayMessage);
             box.scrollTop = box.scrollHeight;
         }
 
@@ -211,46 +212,25 @@
             const isMe = m.id === me.id;
             const box = document.getElementById('messages');
             const d = document.createElement('div');
-            d.id = `msg-${m._id}`;
             d.className = `flex ${isMe ? 'justify-end' : 'justify-start'} mb-2 msg-container`;
-            
-            const av = m.avatar ? `<img src="${m.avatar}" class="w-6 h-6 rounded-full object-cover">` : `<div class="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center text-[10px]">${m.user[0]}</div>`;
-            
             d.innerHTML = `<div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[85%]">
-                <div class="flex items-center gap-2 mb-1">
-                    ${!isMe ? av : ''} <span class="text-[10px] opacity-50">${m.user}</span> ${isMe ? av : ''}
-                </div>
+                <span class="text-[10px] opacity-50 mb-1">${m.user}</span>
                 <div class="flex items-center gap-2">
                     ${isMe ? `<i onclick="deleteMsg('${m._id}')" class="fas fa-trash-alt del-icon text-[10px]"></i>` : ''}
-                    <div class="${isMe ? 'bg-blue-600 shadow-lg shadow-blue-600/20' : 'bg-slate-800'} px-4 py-2 rounded-2xl text-sm">
+                    <div class="${isMe ? 'bg-blue-600' : 'bg-slate-800'} px-4 py-2 rounded-2xl text-sm">
                         ${m.text.startsWith('data:image') ? `<img src="${m.text}" class="rounded-lg">` : m.text}
                     </div>
                 </div>
             </div>`;
-            box.appendChild(d);
-            box.scrollTop = box.scrollHeight;
+            box.appendChild(d); box.scrollTop = box.scrollHeight;
         }
-
         function deleteMsg(id) { if(confirm("Удалить?")) socket.emit('delete message', id); }
-
-        socket.on('message deleted', (id) => {
-            messageCache = messageCache.filter(m => m._id !== id);
-            const el = document.getElementById(`msg-${id}`);
-            if (el) el.remove();
-        });
-
         document.getElementById('msg-form').onsubmit = (e) => {
-            e.preventDefault();
-            const inp = document.getElementById('m-input');
-            if (inp.value.trim()) {
-                socket.emit('chat message', { user: me.nick, id: me.id, to: activeChat, text: inp.value });
-                inp.value = '';
-            }
+            e.preventDefault(); const inp = document.getElementById('m-input');
+            if (inp.value.trim()) { socket.emit('chat message', { user: me.nick, id: me.id, to: activeChat, text: inp.value }); inp.value = ''; }
         };
-
         document.getElementById('file-input').onchange = (e) => {
-            const r = new FileReader();
-            r.onload = (ev) => socket.emit('chat message', { user: me.nick, id: me.id, to: activeChat, text: ev.target.result });
+            const r = new FileReader(); r.onload = (ev) => socket.emit('chat message', { user: me.nick, id: me.id, to: activeChat, text: ev.target.result });
             r.readAsDataURL(e.target.files[0]);
         };
     </script>
